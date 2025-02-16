@@ -3,6 +3,8 @@
 library(ggplot2)
 library(dplyr) 
 library(tidyr)
+library(knitr)
+library(kableExtra)
 set.seed(123)  # For reproducibility
 
 #b)
@@ -12,7 +14,7 @@ set.seed(123)  # For reproducibility
 ########################################################################################
 
 # Define the policy
-adaptive_bandit <- function(n = 200, N = 30, l1, u1, l2, u2, m) {
+adaptive_bandit <- function(n = 200, N, l1, u1, l2, u2, m) {
   
   # Generate rewards from uniform distributions
   arm1_rewards <- runif(n, min = l1, max = u1)
@@ -38,7 +40,7 @@ adaptive_bandit <- function(n = 200, N = 30, l1, u1, l2, u2, m) {
     # Compute probabilities
     prob1 <- mean1 / (mean1 + mean2)
     prob2 <- 1 - prob1
-    epsilon <- max(1/t,m)#0.025 for presentation
+    epsilon <- max(1/(t),m)#0.025 for presentation
     
     if (runif(1) < epsilon) {
       chosen_arm <- ifelse(rbinom(1, 1, prob1) == 1, 1, 2)# Explore: pick a random arm
@@ -74,13 +76,79 @@ adaptive_bandit <- function(n = 200, N = 30, l1, u1, l2, u2, m) {
 }
 
 
-
 #######################################################################################################
+# Choosing the parameters
+#######################################################################################################
+
+# Define parameter grids
+epsilon_values <- seq(0.005, 0.01, by = 0.001)
+N_values <- seq(2, 10, by = 2)
+
+# Create all combinations
+param_grid_parameters <- expand.grid(epsilon = epsilon_values, N = N_values)
+
+# Distribution boundaries
+values <- c(0.1, 0.3, 0.5, 0.7, 0.9)
+
+# Define parameter grid
+param_grid <- expand.grid(l1 = values, u1 = values, l2 = values, u2 = values)
+param_grid <- subset(param_grid, l1 < u1 & l2 < u2)  # Ensure valid ranges
+
+
+#Num sim
+n_sims <- 50
+
+
+# Placeholder for results
+results_parameter_selection <- data.frame(k = numeric(), N = numeric(), MeanRegret = numeric(), StandDev=numeric())
+
+# Loop through each parameter combination
+for (j in 1:nrow(param_grid_parameters)) {
+  epsilon <- param_grid_parameters$epsilon[j]
+  N <- param_grid_parameters$N[j]
+  
+  results_parameters <- data.frame(l1 = numeric(), u1 = numeric(), l2 = numeric(), u2 = numeric(), 
+                                MeanRegret = numeric())
+  for (i in 1:nrow(param_grid)) {
+    l1 <- param_grid$l1[i]
+    u1 <- param_grid$u1[i]
+    l2 <- param_grid$l2[i]
+    u2 <- param_grid$u2[i]
+    
+    # Run multiple simulations
+    regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = N, l1 = l1, u1 = u1, l2 = l2, u2 = u2,m=epsilon))
+    
+    # Compute statistics
+    mean_regret <- mean(regrets)
+    
+    # Store results
+    results_parameters <- rbind(results_parameters, data.frame(l1 = l1, u1 = u1, l2 = l2, u2 = u2, MeanRegret = mean_regret))
+  }
+  
+  results_parameter_selection <- rbind(results_parameter_selection, data.frame(k=epsilon, N=N, MeanRegret=mean(results_parameters$MeanRegret),
+                                                                               StandDev = sd(results_parameters$MeanRegret)))
+}  
+  
+  
+
+# Find the best parameters
+best_params <- results_parameter_selection[order(results_parameter_selection$MeanRegret),]
+print(best_params[1,])
+
+kable(best_params[1:10, ], digits = 4, format = "html", row.names = FALSE, 
+      align = rep("c", ncol(best_params))) %>%
+  kable_styling(position = "center", 
+                font_size = 16, # Adjust the font size if needed
+                full_width = F,
+                bootstrap_options = c("striped", "hover")) %>% # Makes the table more compact
+  column_spec(1:ncol(best_params), width = "5em") %>% # Adjusts column width
+  row_spec(0, bold = TRUE, background = "lightblue") #
+#################################################################NULL#######################################################################################################
 # Testing different values of epsilon
 #######################################################################################################
 
 # Tested values of m
-lower_boundary <- seq(0.005, 0.04, by=0.0025)
+lower_boundary <- seq(0.005, 0.025, by=0.001)
 
 # Distribution boundaries
 values <- c(0.1, 0.3, 0.5, 0.7, 0.9)
@@ -91,7 +159,7 @@ param_grid <- subset(param_grid, l1 < u1 & l2 < u2)  # Ensure valid ranges
 results_lower_boundary <- param_grid
 
 # Run simulations
-n_sims <- 50  # Number of simulations per setting
+n_sims <- 500  # Number of simulations per setting
 
 
 #Main loop
@@ -105,7 +173,7 @@ for (k in 1:length(lower_boundary)){
     u2 <- param_grid$u2[i]
     
     # Run multiple simulations
-    regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = 8, l1 = l1, u1 = u1, l2 = l2, u2 = u2,m=lower_boundary[k]))
+    regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = 4, l1 = l1, u1 = u1, l2 = l2, u2 = u2,m=lower_boundary[k]))
     
     # Compute statistics
     mean_regret <- mean(regrets)
@@ -134,8 +202,8 @@ plot_epsilon1 <- ggplot(lower_boundary_analysis, aes(x = lower_boundary)) +
   geom_bar(aes(y = MeanRegret, fill = "Mean Regret"), stat = "identity") +
   geom_line(aes(y = StandDev, color = "Standard Deviation"), linewidth = 1) +
   geom_point(aes(y = StandDev, color = "Standard Deviation"), size = 2) +
-  labs(title = "Mean Regret and Standard Deviation across m values",
-       x = "m values", 
+  labs(title = "Mean Regret and Standard Deviation across k values",
+       x = "k values", 
        y = "Value") +
   scale_color_manual(values = c("Standard Deviation" = "red")) +
   scale_fill_manual(values = c("Mean Regret" = "light blue")) +
@@ -145,7 +213,7 @@ plot_epsilon1 <- ggplot(lower_boundary_analysis, aes(x = lower_boundary)) +
   scale_x_continuous(breaks = lower_boundary_analysis$lower_boundary) + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axi
 
-#print(plot_epsilon1)
+print(plot_epsilon1)
 
 #----------------------------------------------------------------Box plot----------------------------------------------------------------
 # Reshape data from wide to long format
@@ -168,7 +236,7 @@ plot_epsilon2 <- ggplot(results_long, aes(x = factor(m_value), y = MeanRegret)) 
        x = "m Value", y = "Mean Regret") +
   theme_minimal()
 
-#print(plot_epsilon2)
+print(plot_epsilon2)
 
 
 #-----------------------------------------------------------Bisection to find a better approximation--------------------------------------------------------
@@ -237,85 +305,6 @@ print(optimal_epsilon)
 
 
 #######################################################################################################
-# COMPUTING RESULTS WITH SELECTED VALUE
-#######################################################################################################
-
-# Define parameter grid
-values <- c(0.1, 0.3, 0.5, 0.7, 0.9)
-param_grid <- expand.grid(l1 = values, u1 = values, l2 = values, u2 = values)
-param_grid <- subset(param_grid, l1 < u1 & l2 < u2)  # Ensure valid ranges
-
-
-# Run simulations
-n_sims <- 50  # Number of simulations per setting
-main_results <- data.frame(l1 = numeric(), u1 = numeric(), l2 = numeric(), u2 = numeric(), 
-                           MeanRegret = numeric(), StdErr = numeric(), LowerCI = numeric(), UpperCI = numeric())
-
-for (i in 1:nrow(param_grid)) {
-  l1 <- param_grid$l1[i]
-  u1 <- param_grid$u1[i]
-  l2 <- param_grid$l2[i]
-  u2 <- param_grid$u2[i]
-  
-  # Run multiple simulations
-  regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = 8, l1 = l1, u1 = u1, l2 = l2, u2 = u2,m=optimal_epsilon))
-  
-  # Compute statistics
-  mean_regret <- mean(regrets)
-  std_error <- sd(regrets) / sqrt(n_sims)
-  ci_lower <- mean_regret - qnorm(0.975) * std_error #Compute 95% Confidence Interval
-  ci_upper <- mean_regret + qnorm(0.975) * std_error
-  
-  ### I just changed the 1.96 to qnorm for more accurate results
-  
-  # Store results
-  main_results <- rbind(main_results, data.frame(l1 = l1, u1 = u1, l2 = l2, u2 = u2, 
-                                                 MeanRegret = mean_regret, StdErr = std_error, LowerCI = ci_lower, UpperCI = ci_upper))
-}
-
-mean(main_results$MeanRegret)
-mean(main_results$StdErr)
-
-
-
-
-#######################################################################################################
-# BASIC RESULT CHECK
-#######################################################################################################
-
-# Mean and regret correlation
-results_mean <- main_results %>%  mutate(Mean1 = round((l1+u1)/2, digits=5), Mean2 = round((l2+u2)/2, digits=5), diff = round(abs(Mean1-Mean2), digits = 5))
-results_mean_analysis <- results_mean %>% group_by(diff) %>% summarise(n=n(), MeanRegret = mean(MeanRegret), StdErr = mean(StdErr))
-ordered_results <- results_mean[order(results_mean$MeanRegret),]
-
-# Results for same boundaries 
-#results_same_boundaries <- results[which(results$l1==results$l2 & results$u1==results$u2),]
-
-# Low regret combinations
-mean_0_comb <- results_mean[which(results_mean$diff==0),] 
-low_regret_results <- main_results[which(results$MeanRegret<0.6),] 
-
-#Checking if they match
-merge(low_regret_results, mean_0_comb, by=c("l1","u1","l2","u2", "MeanRegret", "StdErr", "LowerCI", "UpperCI"))
-
-# High regret combo
-high_regret_results <- ordered_results[96:100,] 
-
-### Conclusion for this checks: I checked if the results make sense based on a chosen distribution boundaries. For low regret combinations the results
-# make sense, when the mean is the same, the regret is close to zero. This fall into distinct category (graph blue dots). The results also make sense for 
-# high regret combinations because the biggest mean difference coincides with the highest regret.
-
-# Find the minimum and maximum regret configurations
-min_regret_row <- main_results[which.min(main_results$MeanRegret), ]
-max_regret_row <- main_results[which.max(main_results$MeanRegret), ]
-
-min_regret_row
-max_regret_row
-
-
-
-
-#######################################################################################################
 # STARTING SAMPLE
 #######################################################################################################
 
@@ -335,7 +324,7 @@ for (k in 1:length(starting_sample_size)){
     u2 <- param_grid$u2[i]
     
     # Run multiple simulations
-    regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = starting_sample_size[k], l1 = l1, u1 = u1, l2 = l2, u2 = u2, m=0.0075))
+    regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = starting_sample_size[k], l1 = l1, u1 = u1, l2 = l2, u2 = u2, m=0.005))
     
     # Compute statistics
     mean_regret <- mean(regrets)
@@ -358,7 +347,7 @@ plot_sample_size <- ggplot(sample_size_analysis, aes(x = Sample_size)) +
   geom_bar(aes(y = Regret, fill = "Mean Regret"), stat = "identity") +
   geom_line(aes(y = StandDev, color = "Standard Deviation"), linewidth = 1) +
   geom_point(aes(y = StandDev, color = "Standard Deviation"), size = 2) +
-  labs(title = "Mean Regret and Standard Deviation for Different Starting Sample",
+  labs(title = "Mean Regret and Standard Deviation for Different Starting Sample N",
        x = "Sample Size", 
        y = "Value") +
   scale_color_manual(values = c("Standard Deviation" = "red")) +
@@ -370,6 +359,84 @@ plot_sample_size <- ggplot(sample_size_analysis, aes(x = Sample_size)) +
 
 #print(plot_sample_size)
 
+
+
+
+#######################################################################################################
+# COMPUTING RESULTS WITH SELECTED VALUE
+#######################################################################################################
+
+# Define parameter grid
+values <- c(0.1, 0.3, 0.5, 0.7, 0.9)
+param_grid <- expand.grid(l1 = values, u1 = values, l2 = values, u2 = values)
+param_grid <- subset(param_grid, l1 < u1 & l2 < u2)  # Ensure valid ranges
+
+
+# Run simulations
+n_sims <- 50  # Number of simulations per setting
+main_results <- data.frame(l1 = numeric(), u1 = numeric(), l2 = numeric(), u2 = numeric(), 
+                           MeanRegret = numeric(), StdErr = numeric(), LowerCI = numeric(), UpperCI = numeric())
+
+for (i in 1:nrow(param_grid)) {
+  l1 <- param_grid$l1[i]
+  u1 <- param_grid$u1[i]
+  l2 <- param_grid$l2[i]
+  u2 <- param_grid$u2[i]
+  
+  # Run multiple simulations
+  regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = 4, l1 = l1, u1 = u1, l2 = l2, u2 = u2,m=0.001))
+  
+  # Compute statistics
+  mean_regret <- mean(regrets)
+  std_error <- sd(regrets) / sqrt(n_sims)
+  ci_lower <- mean_regret - qnorm(0.975) * std_error #Compute 95% Confidence Interval
+  ci_upper <- mean_regret + qnorm(0.975) * std_error
+  
+  ### I just changed the 1.96 to qnorm for more accurate results
+  
+  # Store results
+  main_results <- rbind(main_results, data.frame(l1 = l1, u1 = u1, l2 = l2, u2 = u2, 
+                                                 MeanRegret = mean_regret, StdErr = std_error, LowerCI = ci_lower, UpperCI = ci_upper))
+}
+
+sd(main_results$MeanRegret)
+mean(main_results$MeanRegret)
+mean(main_results$StdErr)
+
+
+
+#######################################################################################################
+# BASIC RESULT CHECK
+#######################################################################################################
+
+# Mean and regret correlation
+results_mean <- main_results %>%  mutate(Mean1 = round((l1+u1)/2, digits=5), Mean2 = round((l2+u2)/2, digits=5), diff = round(abs(Mean1-Mean2), digits = 5))
+results_mean_analysis <- results_mean %>% group_by(diff) %>% summarise(n=n(), MeanRegret = mean(MeanRegret), StdErr = mean(StdErr))
+ordered_results <- results_mean[order(results_mean$MeanRegret),]
+
+# Results for same boundaries 
+#results_same_boundaries <- main_results[which(main_results$l1==main_results$l2 & main_results$u1==main_results$u2),]
+
+# Low regret combinations
+mean_0_comb <- results_mean[which(results_mean$diff==0),] 
+low_regret_results <- main_results[which(main_results$MeanRegret<0.6),] 
+
+#Checking if they match
+merge(low_regret_results, mean_0_comb, by=c("l1","u1","l2","u2", "MeanRegret", "StdErr", "LowerCI", "UpperCI"))
+
+# High regret combo
+high_regret_results <- ordered_results[96:100,] 
+
+### Conclusion for this checks: I checked if the results make sense based on a chosen distribution boundaries. For low regret combinations the results
+# make sense, when the mean is the same, the regret is close to zero. This fall into distinct category (graph blue dots). The results also make sense for 
+# high regret combinations because the biggest mean difference coincides with the highest regret.
+
+# Find the minimum and maximum regret configurations
+min_regret_row <- main_results[which.min(main_results$MeanRegret), ]
+max_regret_row <- main_results[which.max(main_results$MeanRegret), ]
+
+min_regret_row
+max_regret_row
 
 
 
@@ -469,7 +536,7 @@ plot_comparison <- ggplot(long_comparison_data, aes(x = SampleSize, y = Regret_V
   geom_bar(stat = "identity", position = position_dodge(width = 0.9)) +  
   labs(title = "Comparison with Non-Adaptive Approach", 
        x = "Sample Size",
-       y = "Regret Value") +
+       y = "Regret") +
   theme_minimal() +  # Minimal theme
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_x_continuous(breaks=long_comparison_data$SampleSize)+
@@ -481,7 +548,7 @@ plot_comparison <- ggplot(long_comparison_data, aes(x = SampleSize, y = Regret_V
 # PRESENTING THE RESULTS
 #######################################################################################################
 
-plot_results <- results %>% filter(ifelse(l1 == l2, u1 <= u2, l1 <= l2))
+plot_results <- main_results %>% filter(ifelse(l1 == l2, u1 <= u2, l1 <= l2))
 min_regret_row_plot <- plot_results[which.min(plot_results$MeanRegret), ]
 max_regret_row_plot <- plot_results[which.max(plot_results$MeanRegret), ]
 
@@ -600,7 +667,7 @@ for (i in 1:nrow(reward_configs)) {
 
 
 #-------------------------------------------------------------------Plot-----------------------------------------------------------------------
-plot_comparison <- merge(results, results_fixed_arms, by = c("l1", "u1", "l2", "u2"))
+plot_comparison <- merge(main_results, results_fixed_arms, by = c("l1", "u1", "l2", "u2"))
 
 comparison <- data.frame("Mean Regret"=c(mean(plot_comparison$MeanRegret), mean(plot_comparison$MeanRegretArm1)),
            "Min Regret"= c(min(plot_comparison$MeanRegret), min(plot_comparison$MeanRegretArm1)),
