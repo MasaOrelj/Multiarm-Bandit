@@ -81,7 +81,7 @@ adaptive_bandit <- function(n = 200, N, l1, u1, l2, u2, m) {
 #######################################################################################################
 
 # Define parameter grids
-epsilon_values <- seq(0.005, 0.01, by = 0.001)
+epsilon_values <- seq(0.005, 0.02, by = 0.001) #seq(0.005, 0.01, by = 0.001)
 N_values <- seq(2, 10, by = 2)
 
 # Create all combinations
@@ -96,7 +96,7 @@ param_grid <- subset(param_grid, l1 < u1 & l2 < u2)  # Ensure valid ranges
 
 
 #Num sim
-n_sims <- 50
+n_sims <- 500
 
 
 # Placeholder for results
@@ -135,6 +135,8 @@ for (j in 1:nrow(param_grid_parameters)) {
 best_params <- results_parameter_selection[order(results_parameter_selection$MeanRegret),]
 print(best_params[1,])
 
+
+# Table
 kable(best_params[1:10, ], digits = 4, format = "html", row.names = FALSE, 
       align = rep("c", ncol(best_params))) %>%
   kable_styling(position = "center", 
@@ -143,12 +145,14 @@ kable(best_params[1:10, ], digits = 4, format = "html", row.names = FALSE,
                 bootstrap_options = c("striped", "hover")) %>% # Makes the table more compact
   column_spec(1:ncol(best_params), width = "5em") %>% # Adjusts column width
   row_spec(0, bold = TRUE, background = "lightblue") #
+
+
 #################################################################NULL#######################################################################################################
 # Testing different values of epsilon
 #######################################################################################################
 
 # Tested values of m
-lower_boundary <- seq(0.005, 0.025, by=0.001)
+lower_boundary <- seq(0.005, 0.02, by=0.001)
 
 # Distribution boundaries
 values <- c(0.1, 0.3, 0.5, 0.7, 0.9)
@@ -210,6 +214,7 @@ plot_epsilon1 <- ggplot(lower_boundary_analysis, aes(x = lower_boundary)) +
   coord_cartesian(ylim = c(0.05, NA)) +
   guides(fill = guide_legend(title = NULL), color = guide_legend(title = NULL)) +
   theme_minimal()+
+  ylim(0, 2)+
   scale_x_continuous(breaks = lower_boundary_analysis$lower_boundary) + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axi
 
@@ -313,7 +318,7 @@ starting_sample_size <- seq(2,30,by=2)
 results_for_sample_size <- data.frame("Sample_size" = starting_sample_size, "Regret" = rep(0,length(starting_sample_size)), "StandDev" = rep(0,length(starting_sample_size)))
 for (k in 1:length(starting_sample_size)){
   
-  n_sims <- 5  # Number of simulations per setting
+  n_sims <- 500  # Number of simulations per setting
   results_sample <- data.frame(l1 = numeric(), u1 = numeric(), l2 = numeric(), u2 = numeric(), 
                         MeanRegret = numeric(), StandDev = numeric())
   
@@ -324,7 +329,7 @@ for (k in 1:length(starting_sample_size)){
     u2 <- param_grid$u2[i]
     
     # Run multiple simulations
-    regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = starting_sample_size[k], l1 = l1, u1 = u1, l2 = l2, u2 = u2, m=0.005))
+    regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = starting_sample_size[k], l1 = l1, u1 = u1, l2 = l2, u2 = u2, m=0.006))
     
     # Compute statistics
     mean_regret <- mean(regrets)
@@ -357,7 +362,7 @@ plot_sample_size <- ggplot(sample_size_analysis, aes(x = Sample_size)) +
   coord_cartesian(ylim = c(0.05, NA)) +
   theme_minimal()
 
-#print(plot_sample_size)
+print(plot_sample_size)
 
 
 
@@ -373,7 +378,7 @@ param_grid <- subset(param_grid, l1 < u1 & l2 < u2)  # Ensure valid ranges
 
 
 # Run simulations
-n_sims <- 50  # Number of simulations per setting
+n_sims <- 5000  # Number of simulations per setting
 main_results <- data.frame(l1 = numeric(), u1 = numeric(), l2 = numeric(), u2 = numeric(), 
                            MeanRegret = numeric(), StdErr = numeric(), LowerCI = numeric(), UpperCI = numeric())
 
@@ -384,7 +389,7 @@ for (i in 1:nrow(param_grid)) {
   u2 <- param_grid$u2[i]
   
   # Run multiple simulations
-  regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = 4, l1 = l1, u1 = u1, l2 = l2, u2 = u2,m=0.001))
+  regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = 4, l1 = l1, u1 = u1, l2 = l2, u2 = u2,m=0.006))
   
   # Compute statistics
   mean_regret <- mean(regrets)
