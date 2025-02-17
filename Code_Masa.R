@@ -81,7 +81,7 @@ adaptive_bandit <- function(n = 200, N, l1, u1, l2, u2, m) {
 #######################################################################################################
 
 # Define parameter grids
-epsilon_values <- seq(0.005, 0.02, by = 0.001) #seq(0.005, 0.01, by = 0.001)
+epsilon_values <- seq(0.005, 0.02, by = 0.001) 
 N_values <- seq(2, 10, by = 2)
 
 # Create all combinations
@@ -103,6 +103,7 @@ n_sims <- 500
 results_parameter_selection <- data.frame(k = numeric(), N = numeric(), MeanRegret = numeric(), StandDev=numeric())
 
 # Loop through each parameter combination
+start = Sys.time()
 for (j in 1:nrow(param_grid_parameters)) {
   epsilon <- param_grid_parameters$epsilon[j]
   N <- param_grid_parameters$N[j]
@@ -127,8 +128,10 @@ for (j in 1:nrow(param_grid_parameters)) {
   
   results_parameter_selection <- rbind(results_parameter_selection, data.frame(k=epsilon, N=N, MeanRegret=mean(results_parameters$MeanRegret),
                                                                                StandDev = sd(results_parameters$MeanRegret)))
-}  
-  
+} 
+end <- Sys.time()
+ 
+elapsed_time <- end-start 
   
 
 # Find the best parameters
