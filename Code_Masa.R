@@ -82,8 +82,8 @@ adaptive_bandit <- function(n = 200, N, l1, u1, l2, u2, m) {
 #######################################################################################################
 
 # Define parameter grids
-epsilon_values <- seq(0.005, 0.01, by = 0.001) #seq(0.005, 0.02, by = 0.001) 
-N_values <- c(4,6) #seq(2, 10, by = 2)
+epsilon_values <- seq(0.005, 0.02, by = 0.001) 
+N_values <- seq(2, 10, by = 2)
 
 # Create all combinations
 param_grid_parameters <- expand.grid(epsilon = epsilon_values, N = N_values)
@@ -172,7 +172,7 @@ param_grid <- subset(param_grid, l1 < u1 & l2 < u2)  # Ensure valid ranges
 results_lower_boundary <- param_grid
 
 # Run simulations
-n_sims <- 100  # Number of simulations per setting
+n_sims <- 500  # Number of simulations per setting
 
 
 #Main loop
@@ -197,7 +197,7 @@ for (k in 1:length(lower_boundary)){
   
   col_name <- as.character(lower_boundary[k])
   colnames(results_epsilon)[5] <- col_name 
-  results_lower_boundary <- merge(results_lower_boundary, results_epsilon, by=c("l1","u1","l2","u2")) 
+  results_lower_boundary <- merge(results_lower_boundary, results_epsilon, by=c("l1","u1","l2","u2"))  
 }
 
 
