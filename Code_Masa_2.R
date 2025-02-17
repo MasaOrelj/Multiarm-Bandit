@@ -667,13 +667,14 @@ for (i in 1:nrow(reward_configs)) {
   #ci_policy2 <- quantile(regrets_policy2, c(0.025, 0.975))
   
   delta = 0.05 #For 95% Confidence Interval
+  n=200
   # Confidence bounds for policy 1
-  epsilon_H_policy1 <- sqrt(((u1 - l1)^2 * log(2 / delta)) / (2 * N))
+  epsilon_H_policy1 <- sqrt(((u1 - l1)^2 * log(2 / delta)) / (2 * n))
   ci_lower_H_policy1 <- mean_avg_regret_policy1 - epsilon_H_policy1
   ci_upper_H_policy1 <- mean-avg_regret_policy1 + epsilon_H_policy1
  
   # Confidence bounds for policy 2
-  epsilon_H_policy2 <- sqrt(((u2 - l2)^2 * log(2 / delta)) / (2 * N))
+  epsilon_H_policy2 <- sqrt(((u2 - l2)^2 * log(2 / delta)) / (2 * n))
   ci_lower_H_policy2 <- mean_avg_regret_policy2 - epsilon_H_policy2
   ci_upper_H_policy2 <- mean-avg_regret_policy2 + epsilon_H_policy2
 
