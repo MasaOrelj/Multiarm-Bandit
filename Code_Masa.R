@@ -71,7 +71,7 @@ adaptive_bandit <- function(n = 200, N, l1, u1, l2, u2, m) {
   best_reward <- n*max(exp_val1,exp_val2)
   
   # Compute regret
-  regret <- best_reward - total_reward
+  regret <- max(0,best_reward - total_reward)
   
   return(regret)
 }
@@ -137,8 +137,13 @@ elapsed_time <- end-start
 
 # Find the best parameters
 best_params <- results_parameter_selection[order(results_parameter_selection$MeanRegret),]
+#best_params2 <- best_params
+#bets_parms3 <- best_params
+
 print(best_params[1,])
 
+selected_k <- best_params[1,1]
+selected_N <- best_params[1,2]
 
 # Table
 kable(best_params[1:10, ], digits = 4, format = "html", row.names = FALSE, 
@@ -151,17 +156,16 @@ kable(best_params[1:10, ], digits = 4, format = "html", row.names = FALSE,
   row_spec(0, bold = TRUE, background = "lightblue") #
 
 
-wb <- createWorkbook()
-addWorksheet(wb, "Parameter selection")
-write.xlsx(x, best_params, "Parameter selection")
+
+#write.xlsx(best_params, "Parameter selection2.xlsx")
 
 
-#################################################################NULL#######################################################################################################
+#######################################################################################################
 # Testing different values of epsilon
 #######################################################################################################
 
 # Tested values of m
-lower_boundary <- seq(0.005, 0.01, by=0.001)
+lower_boundary <- seq(0.005, 0.03, by=0.001)
 
 # Distribution boundaries
 values <- c(0.1, 0.3, 0.5, 0.7, 0.9)
@@ -172,7 +176,7 @@ param_grid <- subset(param_grid, l1 < u1 & l2 < u2)  # Ensure valid ranges
 results_lower_boundary <- param_grid
 
 # Run simulations
-n_sims <- 500  # Number of simulations per setting
+n_sims <- 100  # Number of simulations per setting
 
 
 #Main loop
@@ -186,10 +190,10 @@ for (k in 1:length(lower_boundary)){
     u2 <- param_grid$u2[i]
     
     # Run multiple simulations
-    regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = 4, l1 = l1, u1 = u1, l2 = l2, u2 = u2,m=lower_boundary[k]))
+    regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = selected_N, l1 = l1, u1 = u1, l2 = l2, u2 = u2,m=lower_boundary[k]))
     
     # Compute statistics
-    mean_regret <- max(0,mean(regrets))
+    mean_regret <- mean(regrets)
     
     # Store results
     results_epsilon <- rbind(results_epsilon, data.frame(l1 = l1, u1 = u1, l2 = l2, u2 = u2, MeanRegret = mean_regret))
@@ -204,27 +208,32 @@ for (k in 1:length(lower_boundary)){
 lower_boundary_analysis <- data.frame("MeanRegret"=colMeans(results_lower_boundary[5:length(results_lower_boundary[1,])],na.rm = TRUE), 
                                       "StandDev"=apply(results_lower_boundary[5:length(results_lower_boundary[1,])],2, sd, na.rm = TRUE))
 
+mean(results_epsilon[,5])
+
 
 #----------------------------------------------------Line plot-------------------------------------------------------
+
+# Filter data
+k_analysis <- best_params %>% filter(N==4) %>% arrange(k)
 
 # Add the lower_boundary values as a column
 lower_boundary_analysis$lower_boundary <- lower_boundary
 
 # Plot the lines
-plot_epsilon1 <- ggplot(lower_boundary_analysis, aes(x = lower_boundary)) +
+plot_epsilon1 <- ggplot(k_analysis, aes(x = k)) +
   geom_bar(aes(y = MeanRegret, fill = "Mean Regret"), stat = "identity") +
   geom_line(aes(y = StandDev, color = "Standard Deviation"), linewidth = 1) +
   geom_point(aes(y = StandDev, color = "Standard Deviation"), size = 2) +
-  labs(title = "Mean Regret and Standard Deviation across k values",
+  labs(title = "Analysis for N=4 and for different k values",
        x = "k values", 
-       y = "Value") +
+       y = "Regret") +
   scale_color_manual(values = c("Standard Deviation" = "red")) +
   scale_fill_manual(values = c("Mean Regret" = "light blue")) +
   coord_cartesian(ylim = c(0.05, NA)) +
   guides(fill = guide_legend(title = NULL), color = guide_legend(title = NULL)) +
   theme_minimal()+
   ylim(0, 2)+
-  scale_x_continuous(breaks = lower_boundary_analysis$lower_boundary) + 
+  scale_x_continuous(breaks = k_analysis$k) + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axi
 
 print(plot_epsilon1)
@@ -323,13 +332,14 @@ print(optimal_epsilon)
 #######################################################################################################
 
 # Run simulations
+set.seed(16)
 starting_sample_size <- seq(2,30,by=2)
 results_for_sample_size <- data.frame("Sample_size" = starting_sample_size, "Regret" = rep(0,length(starting_sample_size)), "StandDev" = rep(0,length(starting_sample_size)))
 for (k in 1:length(starting_sample_size)){
   
-  n_sims <- 500  # Number of simulations per setting
+  n_sims <- 100  # Number of simulations per setting
   results_sample <- data.frame(l1 = numeric(), u1 = numeric(), l2 = numeric(), u2 = numeric(), 
-                        MeanRegret = numeric(), StandDev = numeric())
+                               MeanRegret = numeric(), StandDev = numeric())
   
   for (i in 1:nrow(param_grid)) {
     l1 <- param_grid$l1[i]
@@ -357,13 +367,16 @@ sample_size_analysis <- results_for_sample_size
 
 
 #---------------------------------------------------------------Plot---------------------------------------------------------------------
+N_analysis <- best_params %>% filter(k==0.008) %>% arrange(N)
+
+
 plot_sample_size <- ggplot(sample_size_analysis, aes(x = Sample_size)) +
   geom_bar(aes(y = Regret, fill = "Mean Regret"), stat = "identity") +
   geom_line(aes(y = StandDev, color = "Standard Deviation"), linewidth = 1) +
   geom_point(aes(y = StandDev, color = "Standard Deviation"), size = 2) +
-  labs(title = "Mean Regret and Standard Deviation for Different Starting Sample N",
+  labs(title = "Analysis for k=0.008 and for different N values",
        x = "Sample Size", 
-       y = "Value") +
+       y = "Regret") +
   scale_color_manual(values = c("Standard Deviation" = "red")) +
   scale_fill_manual(values = c("Mean Regret" = "light blue")) +
   guides(fill = guide_legend(title = NULL), color = guide_legend(title = NULL)) +
@@ -398,7 +411,7 @@ for (i in 1:nrow(param_grid)) {
   u2 <- param_grid$u2[i]
   
   # Run multiple simulations
-  regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = 4, l1 = l1, u1 = u1, l2 = l2, u2 = u2,m=0.006))
+  regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = selected_N, l1 = l1, u1 = u1, l2 = l2, u2 = u2,m=selected_k))
   
   # Compute statistics
   mean_regret <- mean(regrets)
@@ -497,7 +510,7 @@ nonadaptive_bandit <- function(n = 200, N, l1, u1, l2, u2,m) {
   best_reward <- n*max(exp_val1,exp_val2)
   
   # Compute regret
-  regret <- best_reward - total_reward
+  regret <- max(best_reward - total_reward,0)
   
   return(regret)
 }
@@ -508,7 +521,7 @@ starting_sample_size <- seq(2,30,by=2)
 results_for_sample_size_nonad <- data.frame("Sample_size" = starting_sample_size, "Regret" = rep(0,length(starting_sample_size)), "StandDev" = rep(0,length(starting_sample_size)))
 for (k in 1:length(starting_sample_size)){
   
-  n_sims <- 5  # Number of simulations per setting
+  n_sims <- 100  # Number of simulations per setting
   results_non_adaptive <- data.frame(l1 = numeric(), u1 = numeric(), l2 = numeric(), u2 = numeric(), 
                                      MeanRegret = numeric(), StandDev = numeric())
   
@@ -554,9 +567,10 @@ plot_comparison <- ggplot(long_comparison_data, aes(x = SampleSize, y = Regret_V
   theme_minimal() +  # Minimal theme
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_x_continuous(breaks=long_comparison_data$SampleSize)+
-  coord_cartesian(ylim = c(0.05, NA)) 
+  coord_cartesian(ylim = c(0.05, NA))+
+  guides(fill = guide_legend(title = NULL))
 
-
+print(plot_comparison)
 
 #######################################################################################################
 # PRESENTING THE RESULTS
