@@ -5,6 +5,7 @@ library(dplyr)
 library(tidyr)
 library(knitr)
 library(kableExtra)
+library(openxlsx)
 set.seed(123)  # For reproducibility
 
 #b)
@@ -81,8 +82,8 @@ adaptive_bandit <- function(n = 200, N, l1, u1, l2, u2, m) {
 #######################################################################################################
 
 # Define parameter grids
-epsilon_values <- seq(0.005, 0.02, by = 0.001) 
-N_values <- seq(2, 10, by = 2)
+epsilon_values <- seq(0.005, 0.01, by = 0.001) #seq(0.005, 0.02, by = 0.001) 
+N_values <- c(4,6) #seq(2, 10, by = 2)
 
 # Create all combinations
 param_grid_parameters <- expand.grid(epsilon = epsilon_values, N = N_values)
@@ -96,7 +97,7 @@ param_grid <- subset(param_grid, l1 < u1 & l2 < u2)  # Ensure valid ranges
 
 
 #Num sim
-n_sims <- 500
+n_sims <- 100
 
 
 # Placeholder for results
@@ -150,12 +151,17 @@ kable(best_params[1:10, ], digits = 4, format = "html", row.names = FALSE,
   row_spec(0, bold = TRUE, background = "lightblue") #
 
 
+wb <- createWorkbook()
+addWorksheet(wb, "Parameter selection")
+write.xlsx(x, best_params, "Parameter selection")
+
+
 #################################################################NULL#######################################################################################################
 # Testing different values of epsilon
 #######################################################################################################
 
 # Tested values of m
-lower_boundary <- seq(0.005, 0.02, by=0.001)
+lower_boundary <- seq(0.005, 0.01, by=0.001)
 
 # Distribution boundaries
 values <- c(0.1, 0.3, 0.5, 0.7, 0.9)
@@ -166,7 +172,7 @@ param_grid <- subset(param_grid, l1 < u1 & l2 < u2)  # Ensure valid ranges
 results_lower_boundary <- param_grid
 
 # Run simulations
-n_sims <- 500  # Number of simulations per setting
+n_sims <- 100  # Number of simulations per setting
 
 
 #Main loop
@@ -183,7 +189,7 @@ for (k in 1:length(lower_boundary)){
     regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = 4, l1 = l1, u1 = u1, l2 = l2, u2 = u2,m=lower_boundary[k]))
     
     # Compute statistics
-    mean_regret <- mean(regrets)
+    mean_regret <- max(0,mean(regrets))
     
     # Store results
     results_epsilon <- rbind(results_epsilon, data.frame(l1 = l1, u1 = u1, l2 = l2, u2 = u2, MeanRegret = mean_regret))
