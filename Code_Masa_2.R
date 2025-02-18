@@ -133,7 +133,6 @@ for (j in 1:nrow(param_grid_parameters)) {
 
 # Find the best parameters
 best_params <- results_parameter_selection[order(results_parameter_selection$MeanRegret),]
-print(best_params[1,])
 
 
 # Table
@@ -216,9 +215,8 @@ plot_epsilon1 <- ggplot(lower_boundary_analysis, aes(x = lower_boundary)) +
   theme_minimal()+
   ylim(0, 2)+
   scale_x_continuous(breaks = lower_boundary_analysis$lower_boundary) + 
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axi
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
 
-print(plot_epsilon1)
 
 #----------------------------------------------------------------Box plot----------------------------------------------------------------
 # Reshape data from wide to long format
@@ -240,71 +238,6 @@ plot_epsilon2 <- ggplot(results_long, aes(x = factor(m_value), y = MeanRegret)) 
   labs(title = "Box Plot of Mean Regret for Different m Values", 
        x = "m Value", y = "Mean Regret") +
   theme_minimal()
-
-print(plot_epsilon2)
-
-
-#-----------------------------------------------------------Bisection to find a better approximation--------------------------------------------------------
-
-#Simplified function 
-regret_function <- function(epsilon_value, param_grid, n_sims = 5) {
-  results_epsilon <- data.frame(l1 = numeric(), u1 = numeric(), l2 = numeric(), u2 = numeric(), 
-                                MeanRegret = numeric())
-  for (i in 1:nrow(param_grid)) {
-    l1 <- param_grid$l1[i]
-    u1 <- param_grid$u1[i]
-    l2 <- param_grid$l2[i]
-    u2 <- param_grid$u2[i]
-    
-    # Run simulations
-    regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = 8, l1 = l1, u1 = u1, l2 = l2, u2 = u2, m = epsilon_value))
-    
-    # Compute mean regret
-    mean_regret <- mean(regrets)
-    
-    # Store results
-    results_epsilon <- rbind(results_epsilon, data.frame(l1 = l1, u1 = u1, l2 = l2, u2 = u2, MeanRegret = mean_regret))
-  }
-  
-  # Return the mean of all mean regrets
-  return(mean(results_epsilon$MeanRegret))
-}
-
-
-#Bisection
-bisection_method <- function(a, b, tol = 1e-5, max_iter = 10) {
-  iter <- 0
-  while ((b - a) / 2 > tol && iter < max_iter) {
-    mid <- (a + b) / 2
-    
-    # Compute regrets for the left, right, and middle points
-    regret_left <- regret_function(a, param_grid)
-    regret_right <- regret_function(b, param_grid)
-    regret_mid <- regret_function(mid, param_grid)
-    
-    # If the middle value is the smallest, we shrink the interval to [a, mid]
-    if (regret_mid < regret_left && regret_mid < regret_right) {
-      a <- mid
-    } else if (regret_left < regret_right) {
-      b <- mid
-    } else {
-      a <- mid
-    }
-    
-    iter <- iter + 1
-  }
-  return((a + b) / 2)
-}
-
-# Set initial bounds for epsilon
-a <- 0.005 
-b <- 0.025
-
-# Run the bisection method
-optimal_epsilon <- bisection_method(a, b)
-
-# Print the optimal value for epsilon
-print(optimal_epsilon)
 
 
 
@@ -362,7 +295,6 @@ plot_sample_size <- ggplot(sample_size_analysis, aes(x = Sample_size)) +
   coord_cartesian(ylim = c(0.05, NA)) +
   theme_minimal()
 
-print(plot_sample_size)
 
 
 
@@ -408,46 +340,6 @@ for (i in 1:nrow(param_grid)) {
   main_results <- rbind(main_results, data.frame(l1 = l1, u1 = u1, l2 = l2, u2 = u2, 
                                                  MeanRegret = mean_regret, StdErr = std_error, LowerCI = ci_lower_H, UpperCI = ci_upper_H))
 }
-
-sd(main_results$MeanRegret)
-mean(main_results$MeanRegret)
-mean(main_results$StdErr)
-
-
-
-#######################################################################################################
-# BASIC RESULT CHECK
-#######################################################################################################
-
-# Mean and regret correlation
-results_mean <- main_results %>%  mutate(Mean1 = round((l1+u1)/2, digits=5), Mean2 = round((l2+u2)/2, digits=5), diff = round(abs(Mean1-Mean2), digits = 5))
-results_mean_analysis <- results_mean %>% group_by(diff) %>% summarise(n=n(), MeanRegret = mean(MeanRegret), StdErr = mean(StdErr))
-ordered_results <- results_mean[order(results_mean$MeanRegret),]
-
-# Results for same boundaries 
-#results_same_boundaries <- main_results[which(main_results$l1==main_results$l2 & main_results$u1==main_results$u2),]
-
-# Low regret combinations
-mean_0_comb <- results_mean[which(results_mean$diff==0),] 
-low_regret_results <- main_results[which(main_results$MeanRegret<0.6),] 
-
-#Checking if they match
-merge(low_regret_results, mean_0_comb, by=c("l1","u1","l2","u2", "MeanRegret", "StdErr", "LowerCI", "UpperCI"))
-
-# High regret combo
-high_regret_results <- ordered_results[96:100,] 
-
-### Conclusion for this checks: I checked if the results make sense based on a chosen distribution boundaries. For low regret combinations the results
-# make sense, when the mean is the same, the regret is close to zero. This fall into distinct category (graph blue dots). The results also make sense for 
-# high regret combinations because the biggest mean difference coincides with the highest regret.
-
-# Find the minimum and maximum regret configurations
-min_regret_row <- main_results[which.min(main_results$MeanRegret), ]
-max_regret_row <- main_results[which.max(main_results$MeanRegret), ]
-
-min_regret_row
-max_regret_row
-
 
 
 #######################################################################################################
@@ -519,12 +411,7 @@ for (k in 1:length(starting_sample_size)){
     
     # Compute statistics
     mean_regret <- mean(regrets)
-    #std_error <- sd(regrets) / sqrt(n_sims)
     std_dev <- sd(regrets)
-    #ci_lower <- mean_regret - qnorm(0.975) * std_error 
-    #ci_upper <- mean_regret + qnorm(0.975) * std_error
-    
-    ### I just changed the 1.96 to qnorm for more accurate results
     
     # Store results
     results_non_adaptive <- rbind(results_non_adaptive, data.frame(l1 = l1, u1 = u1, l2 = l2, u2 = u2, 
@@ -585,7 +472,6 @@ plot_adaptive <- ggplot(plot_results, aes(x = MeanRegret, y = factor(paste(l1, u
             label = paste("Min Regret \n", "[",min_regret_row_plot$l1,", ", min_regret_row_plot$u1,"]",
                           "[",min_regret_row_plot$l2,", ", min_regret_row_plot$u2,"]"),
             vjust = -1, color = "green", size = 4) +
-  # Highlight maximum regret
   geom_point(data = max_regret_row_plot, aes(x = MeanRegret, y = factor(paste(l1, u1, l2, u2, sep = "-"))), 
              color = "orange", size = 5, shape = 20) + 
   geom_errorbarh(data = max_regret_row_plot, aes(xmin = LowerCI, xmax = UpperCI, 
@@ -595,8 +481,6 @@ plot_adaptive <- ggplot(plot_results, aes(x = MeanRegret, y = factor(paste(l1, u
             label = paste("Max Regret \n", "[",max_regret_row_plot$l1,", ", max_regret_row_plot$u1,"]",
                           "[",max_regret_row_plot$l2,", ", max_regret_row_plot$u2,"]"),
             vjust = -1, color = "orange", size = 4)
-
-plot_adaptive
 
 
 
@@ -660,12 +544,6 @@ for (i in 1:nrow(reward_configs)) {
   avg_regret_policy1 <- round(mean(regrets_policy1), digits=9)
   avg_regret_policy2 <- round(mean(regrets_policy2), digits=9)
   
-  #std_error1 <- sd(regrets_policy1) / sqrt(n_sims)
-  #std_error2 <- sd(regrets_policy2) / sqrt(n_sims)
-  
-  #ci_policy1 <- quantile(regrets_policy1, c(0.025, 0.975))
-  #ci_policy2 <- quantile(regrets_policy2, c(0.025, 0.975))
-  
   delta = 0.05 #For 95% Confidence Interval
   n=200
   # Confidence bounds for policy 1
@@ -685,8 +563,6 @@ for (i in 1:nrow(reward_configs)) {
   
 }
 
-#mean(results_fixed_arms$MeanRegretArm1)
-#mean(results_fixed_arms$MeanRegretArm2)
 
 
 #-------------------------------------------------------------------Plot-----------------------------------------------------------------------
@@ -704,13 +580,13 @@ data_long <- pivot_longer(plot_comparison[,-c(6,7,8,10)], cols = c(MeanRegret, M
 
 
 ggplot(data_long, aes(x = Approach, y = Regret, fill = Approach)) +
-  geom_boxplot(outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +  # Adding outliers
+  geom_boxplot(outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +  
   stat_summary(fun = median, geom = "text", aes(label = round(..y.., 3)), 
-               vjust = -0.5, size = 4, color = "black") +  # Display median
+               vjust = -0.5, size = 4, color = "black") +  
   stat_summary(fun.data = "mean_sdl", geom = "text", 
                aes(label = paste("Mean:", round(..y.., 3))), 
-               vjust = -1, size = 3, color = "blue") +  # Display mean
-  scale_fill_manual(values = c("Mean_regret1" = "skyblue", "Mean_regret2" = "salmon")) +  # Custom colors
+               vjust = -1, size = 3, color = "blue") +  
+  scale_fill_manual(values = c("Mean_regret1" = "skyblue", "Mean_regret2" = "salmon")) +  
   labs(title = "Comparison of Adaptive vs Fixed Arm Regret",
        x = "Approach",
        y = "Mean Regret") +
