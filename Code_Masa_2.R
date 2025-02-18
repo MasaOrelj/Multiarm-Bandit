@@ -64,7 +64,6 @@ adaptive_bandit <- function(n = 200, N, l1, u1, l2, u2, m) {
   total_reward <- sum(received_rewards)
   
   # Compute best possible reward
-  #best_reward <- sum(pmax(arm1_rewards, arm2_rewards))
   exp_val1 <- (l1+u1)/2
   exp_val2 <- (l2+u2)/2
   best_reward <- n*max(exp_val1,exp_val2)
@@ -81,7 +80,7 @@ adaptive_bandit <- function(n = 200, N, l1, u1, l2, u2, m) {
 #######################################################################################################
 
 # Define parameter grids
-epsilon_values <- seq(0.005, 0.02, by = 0.001) #seq(0.005, 0.01, by = 0.001)
+epsilon_values <- seq(0.005, 0.02, by = 0.001) 
 N_values <- seq(2, 10, by = 2)
 
 # Create all combinations
@@ -96,7 +95,7 @@ param_grid <- subset(param_grid, l1 < u1 & l2 < u2)  # Ensure valid ranges
 
 
 #Num sim
-n_sims <- 500
+n_sims <- 100
 
 
 # Placeholder for results
@@ -147,99 +146,28 @@ kable(best_params[1:10, ], digits = 4, format = "html", row.names = FALSE,
 
 
 #################################################################NULL#######################################################################################################
-# Testing different values of epsilon
+# Analysis of different values of epsilon
 #######################################################################################################
 
-# Tested values of m
-lower_boundary <- seq(0.005, 0.02, by=0.001)
-
-# Distribution boundaries
-values <- c(0.1, 0.3, 0.5, 0.7, 0.9)
-
-# Define parameter grid
-param_grid <- expand.grid(l1 = values, u1 = values, l2 = values, u2 = values)
-param_grid <- subset(param_grid, l1 < u1 & l2 < u2)  # Ensure valid ranges
-results_lower_boundary <- param_grid
-
-# Run simulations
-n_sims <- 500  # Number of simulations per setting
-
-
-#Main loop
-for (k in 1:length(lower_boundary)){
-  results_epsilon <- data.frame(l1 = numeric(), u1 = numeric(), l2 = numeric(), u2 = numeric(), 
-                      MeanRegret = numeric())
-  for (i in 1:nrow(param_grid)) {
-    l1 <- param_grid$l1[i]
-    u1 <- param_grid$u1[i]
-    l2 <- param_grid$l2[i]
-    u2 <- param_grid$u2[i]
-    
-    # Run multiple simulations
-    regrets <- replicate(n_sims, adaptive_bandit(n = 200, N = 4, l1 = l1, u1 = u1, l2 = l2, u2 = u2,m=lower_boundary[k]))
-    
-    # Compute statistics
-    mean_regret <- mean(regrets)
-    
-    # Store results
-    results_epsilon <- rbind(results_epsilon, data.frame(l1 = l1, u1 = u1, l2 = l2, u2 = u2, MeanRegret = mean_regret))
-  }
-  
-  col_name <- as.character(lower_boundary[k])
-  colnames(results_epsilon)[5] <- col_name 
-  results_lower_boundary <- merge(results_lower_boundary, results_epsilon, by=c("l1","u1","l2","u2")) 
-}
-
-
-lower_boundary_analysis <- data.frame("MeanRegret"=colMeans(results_lower_boundary[5:length(results_lower_boundary[1,])],na.rm = TRUE), 
-                                      "StandDev"=apply(results_lower_boundary[5:length(results_lower_boundary[1,])],2, sd, na.rm = TRUE))
-
-
-#----------------------------------------------------Line plot-------------------------------------------------------
-
-# Add the lower_boundary values as a column
-lower_boundary_analysis$lower_boundary <- lower_boundary
+# Filter data
+k_analysis <- best_params %>% filter(N==4) %>% arrange(k)
 
 # Plot the lines
-plot_epsilon1 <- ggplot(lower_boundary_analysis, aes(x = lower_boundary)) +
+plot_epsilon1 <- ggplot(k_analysis, aes(x = k)) +
   geom_bar(aes(y = MeanRegret, fill = "Mean Regret"), stat = "identity") +
   geom_line(aes(y = StandDev, color = "Standard Deviation"), linewidth = 1) +
   geom_point(aes(y = StandDev, color = "Standard Deviation"), size = 2) +
-  labs(title = "Mean Regret and Standard Deviation across k values",
+  labs(title = "Analysis for N=4 and for different k values",
        x = "k values", 
-       y = "Value") +
+       y = "Regret") +
   scale_color_manual(values = c("Standard Deviation" = "red")) +
   scale_fill_manual(values = c("Mean Regret" = "light blue")) +
   coord_cartesian(ylim = c(0.05, NA)) +
   guides(fill = guide_legend(title = NULL), color = guide_legend(title = NULL)) +
   theme_minimal()+
   ylim(0, 2)+
-  scale_x_continuous(breaks = lower_boundary_analysis$lower_boundary) + 
+  scale_x_continuous(breaks = k_analysis$k) + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))  
-
-
-#----------------------------------------------------------------Box plot----------------------------------------------------------------
-# Reshape data from wide to long format
-results_long <- pivot_longer(results_lower_boundary, 
-                             cols = 5:ncol(results_lower_boundary), 
-                             names_to = "m_value", 
-                             values_to = "MeanRegret")
-
-#Convert to numeric
-results_long$m_value <- as.numeric(results_long$m_value)
-
-
-# Plot boxplot with means
-plot_epsilon2 <- ggplot(results_long, aes(x = factor(m_value), y = MeanRegret)) +
-  geom_boxplot(fill = "lightblue", color = "blue") +
-  stat_summary(fun = mean, geom = "point", color = "red", size = 2) +
-  stat_summary(fun = mean, geom = "text", aes(label = round(..y.., 3)), 
-               vjust = -0.5, color = "red", size = 3) +
-  labs(title = "Box Plot of Mean Regret for Different m Values", 
-       x = "m Value", y = "Mean Regret") +
-  theme_minimal()
-
-
 
 
 #######################################################################################################
@@ -251,7 +179,7 @@ starting_sample_size <- seq(2,30,by=2)
 results_for_sample_size <- data.frame("Sample_size" = starting_sample_size, "Regret" = rep(0,length(starting_sample_size)), "StandDev" = rep(0,length(starting_sample_size)))
 for (k in 1:length(starting_sample_size)){
   
-  n_sims <- 500  # Number of simulations per setting
+  n_sims <- 100  
   results_sample <- data.frame(l1 = numeric(), u1 = numeric(), l2 = numeric(), u2 = numeric(), 
                         MeanRegret = numeric(), StandDev = numeric())
   
@@ -396,7 +324,7 @@ starting_sample_size <- seq(2,30,by=2)
 results_for_sample_size_nonad <- data.frame("Sample_size" = starting_sample_size, "Regret" = rep(0,length(starting_sample_size)), "StandDev" = rep(0,length(starting_sample_size)))
 for (k in 1:length(starting_sample_size)){
   
-  n_sims <- 5  # Number of simulations per setting
+  n_sims <- 100
   results_non_adaptive <- data.frame(l1 = numeric(), u1 = numeric(), l2 = numeric(), u2 = numeric(), 
                                      MeanRegret = numeric(), StandDev = numeric())
   
